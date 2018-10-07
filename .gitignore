@@ -2,6 +2,10 @@
 data/*
 !data/.gitkeep
 
+# Term-Document Matrices
+tdm/*
+!tdm/.gitkeep
+
 # Mac files
 .DS_Store
 # History files
