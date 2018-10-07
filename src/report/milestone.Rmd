@@ -1,0 +1,131 @@
+---
+title: "Capstone Milestone"
+author: "Dan Berd"
+date: "10/7/2018"
+output: html_document
+---
+
+#Text Prediction Project
+
+##Introduction 
+Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. Here in this project I will try to create predictive model using Natural Language Processing. In this presentation, I will try to get and explore the data.
+
+In most of natural language processing problems people get rid of the stopwords, but in this problem, since the stopwords are the most used, it wouldn't be the best solution
+
+
+##Task 0 - Understanding the problem 
+Get the libraries we will need and obtain data we will work with
+```{r warning=F, message=F}
+library(tm)
+library(ggplot2)
+library(stringi)
+library(RWeka)
+library(ggplot2)
+```
+
+```{r warning=F, message=F}
+blogs<-readLines("../../data/en_US/en_US.blogs.txt")
+news<-readLines("../../data/en_US/en_US.news.txt")
+twitter<-readLines("../../data/en_US/en_US.twitter.txt")
+```
+So, let's see how many lines do we have in each document
+```{r}
+print(length(blogs))
+print(length(news))
+print(length(twitter))
+```
+Now, let's explore some of the properties of our data
+```{r}
+print(summary(nchar(blogs)))
+print(summary(nchar(news)))
+print(summary(nchar(twitter)))
+```
+
+
+From the summary above we already can see what we would think would hold true for this datasets.
+We can see that the medium amount of chars in the lines of data is more in news, and then blogs and then of course twitter messages. The mean of blog data is more than the mean of data, because of extremes in blogs data, we can see that line having maximum characters is in blogs data, having more than 40000 characters.
+Also we can see that maximum amount of chars in twitter messages is 140, which is correct, because the limit is set by the twitter itself.
+
+Let's explore some word properties in the dataset 
+```{r}
+blogs.words <- stri_count_words(blogs)
+news.words <- stri_count_words(news)
+twitter.words <- stri_count_words(twitter)
+
+data.frame(source = c("blogs", "news", "twitter"),
+           num.lines = c(length(blogs), length(news), length(twitter)),
+           num.words = c(sum(blogs.words), sum(news.words), sum(twitter.words)),
+           mean.num.words = c(mean(blogs.words), mean(news.words), mean(twitter.words)))
+```
+
+
+##Cleaning data
+
+Before performing exploratory analysis, we should clean the data first. We should remove whitespaces, punctuation, numbers and also we should change the case to lowercase, also we would want to remove profanity. Also because the data is relatively big, I would like to take a sample from it
+
+```{r}
+set.seed(679)
+data.sample <- c(sample(blogs, length(blogs) * 0.01),
+                 sample(news, length(news) * 0.01),
+                 sample(twitter, length(twitter) * 0.01))
+
+corpus <- VCorpus(VectorSource(data.sample))
+clean_data <- tm_map(corpus, tolower)
+clean_data <- tm_map(clean_data, removePunctuation)
+clean_data <- tm_map(clean_data, removeNumbers)
+clean_data <- tm_map(clean_data, stripWhitespace)
+clean_data <- tm_map(clean_data, PlainTextDocument)
+```
+
+##Exploritary Analysis
+
+Now  we are ready to perform exploratory analysis on the data. We can explore the most frequently occurring words in the data. Here I list the most common unigrams, bigrams, and trigrams.
+
+```{r}
+getFreq <- function(tdm) {
+  freq <- sort(rowSums(as.matrix(tdm)), decreasing = TRUE)
+  return(data.frame(word = names(freq), freq = freq))
+}
+bigram <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+trigram <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+```
+
+And let's create a ploting function for unigrams, bigrams and trigrams
+```{r}
+plotFreq <- function(data, label) {
+  ggplot(data[1:50,], aes(reorder(word, -freq), freq)) +
+         labs(x = label, y = "Frequency") +
+         theme(axis.text.x = element_text(angle = 70, size = 11, hjust = 1)) +
+         geom_bar(stat = "identity", fill = I("blue"))
+}
+```
+
+And finally let's make frequencies
+```{r}
+freq1 <- getFreq(removeSparseTerms(TermDocumentMatrix(clean_data), 0.9999))
+freq2 <- getFreq(removeSparseTerms(TermDocumentMatrix(clean_data, control = list(tokenize = bigram)), 0.9999))
+freq3 <- getFreq(removeSparseTerms(TermDocumentMatrix(clean_data, control = list(tokenize = trigram)), 0.9999))
+```
+
+###Frequency of unigrams
+Most of the words in the first unigram contain stopwords, but this doesn't mean people won't write these words, that's why we should include the stopwords into the analysis
+
+#####50 Most Used Unigrams
+```{r}
+plotFreq(freq1, "50 Most Used Unigrams")
+```
+
+#####50 Most Used Bigrams
+```{r}
+plotFreq(freq2, "50 Most Used Bigrams")
+```
+
+#####50 Most Used Trigrams
+```{r}
+plotFreq(freq3, "50 Most Used Trigrams")
+```
+
+##Next Steps For Prediction Algorithm And Shiny App
+This concludes our exploritary analysis, as I expected most of the n-grams consisted of stopwords, which would be silly to get rid of when doing the model.
+My predictive algorithm will be using n-gram model with frequency lookup similar to our exploratory analysis above.
+The user interface of the Shiny app will consist of a text input box that will allow a user to enter a phrase. Then the app will use algorithm to suggest the most likely next word.
